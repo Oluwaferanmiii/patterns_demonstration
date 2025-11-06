@@ -1,0 +1,354 @@
+\documentclass[a4paper, 12pt]{article}
+\usepackage[S=WSEI, L=ENG]{TomekG}
+\usepackage{float}
+\usepackage{tikz}
+\usepackage{pgf-umlcd}
+\usepackage{pgf-umlsd}
+\usepackage{struktex}
+\hypersetup{hidelinks}
+
+\renewcommand{\Course}{Advanced Software Engineering$^\circ$}
+\renewcommand{\titleLab}{Design Patterns for University Access Control Application}
+\renewcommand{\Author}{Feranmi Akinwale}
+\renewcommand{\Supervisor}{dr inż. Tomasz Giżewski}
+\renewcommand{\Students}{Feranmi Akinwale}
+\renewcommand{\lab}{Advanced Software Engineering Lab 1}
+\renewcommand{\groupLab}{Gr-1}
+\renewcommand{\Date}{30-10-2025}
+\renewcommand{\Rodzaj}{Laboratory 01}
+
+\begin{document}
+\RapPage
+\tableofcontents
+\newpage
+
+\section{Introduction}
+	This laboratory project presents the conceptual design of a \textit{University Access Control and Scheduling System}. The purpose is to manage user authentication, building access, work-hour logging, and classroom scheduling within campus environment.
+	To ensure scalabiltiy and maintainability, three behavioral design patterns are used:
+	\begin{itemize}
+		\item \textbf{Singleton} - This is to guarantee a single global configuration manager that holds universal policies such as access levels and logging preferences.
+		\item \textbf{Factory Method} - This is to dynamically create various user roles (Administrator, Lecturer, Student, Technician, Visitor) based on authentication data.
+		\item \textbf{Observer} - This is to enable real-time notifications so dashboards and monitoring interfaces automatically react to events such as card scans or room occupancy changes.
+
+		Together, these patterns form a coherent architecture that separates concerns, promotes extensibility, and supports reactive behavior across system modules.
+	\end{itemize}
+	
+\section{Conceptual Functionalities}
+
+\subsection{Access Control}
+Every person entering the campus is associated with a digital identity card. When a card is scanned at the entrance terminal, the system authenticates the user and consults the central \textbf{Access Policy Manager} (SIngleton). If access is granted, the event is logged by the global logger and observers such as security dashboard and audit modules are notified in real time.
+
+\subsection{Work Time Management}
+University employees (lecturers, administrators, technicians) registers their start and end times by scanning their cards. The \textbf{Work Time Service} communicates with a reporting module that aggregates daily working hours. The Observer pattern ensures that any change in recorded hours instantly updates connected interfaces, such as HR dashboards or employee portals.
+
+\newpage
+\subsection{Room Occupancy and Scheduling}
+Each lecture room has an occupancy sensor or schedule trigger. When a room becomes occupied, an event is broadcast to observed subscribers - classroom dashboards, timetables apps, or the central monitoring screen. Scheduling modules employ the Factory Method to create appropraite schedule objects (\textit{LectureSchedule, ExamSchedule, MaintenanceSchedule}), enabling flexible handling of different event types.
+
+
+\section{Applied Design Patterns}
+
+\subsection{Singleton Pattern - Central Configuration Manager}
+The \textbf{Singleton pattern} is used to ensure that certain component of the system exists only once during runtime. In this architecture, it is applied to the \textbf{AccessPolicyManager}, which acts as a central authority for all authentication and authorization rules across the university system. 
+
+Whenever a user scans an identification card, any module that requires policy verification retrieves the same instance of the AccessPolicyManager through its \texttt{getinstance()} method. This guarantees that all parts of the system rely on a single, coherent set of rules rather than maintaining separate or conflicting copies.
+
+The Singleton also improves maintainability and resource efficiency. Configuration data, logging preferences, and global parameters are stored and updated in one location, ensuring consistency throughout the platform. Because only one instance exists, it becomes easier to synchronize access, maintain system state, and reduce memory overhead. 
+
+\subsubsection{Singleton — Class Diagram}
+\begin{figure}[H]
+	\centering
+	\begin{tikzpicture}[scale=1, transform shape]
+		\tikzset{
+			umlrel/.style={-Latex, line width=0.6pt, shorten >=3pt, shorten <=3pt, below},
+			umllabel/.style={midway, fill=white, inner sep=1pt},
+			umlgen/.style={umlrel},
+			umlimpl/.style={umlrel, dashed}
+		}
+		
+		% Nodes
+		\begin{class}[text width=7.2cm]{AccessPolicyManager}{0,0}
+			\attribute{- instance : AccessPolicyManager}
+			\attribute{- curfew\_enabled : bool}
+			\operation{+ getInstance() : AccessPolicyManager}
+			\operation{+ getRole(userId: string) : RoleType}
+			\operation{+ isAllowed(u: User, doorId: string) : bool}
+		\end{class}
+		
+		\begin{class}[text width=6.0cm]{AccessController}{9,0}
+			\operation{+ handleScan(cardId: string, doorId: string) : void}
+			\operation{+ notify(evt: AccessEvent) : void}
+			\operation{+ attach(o: Observer) : void}
+			\operation{+ detach(o: Observer) : void}
+		\end{class}
+		
+		% Relationship (uses)
+		\draw[umlrel][umlimpl] (AccessController) -- node[umllabel]{\footnotesize \guillemotleft uses\guillemotright} (AccessPolicyManager);
+		
+	\end{tikzpicture}
+	\caption{Singleton pattern: one \texttt{AccessPolicyManager} used by \texttt{AccessController}.}
+\end{figure}
+
+\newpage
+\subsection{Factory Method Pattern - Dynamic User Creation}
+The \textbf{Factory Method pattern} is employed to handle the creation of user objects with different roles and permissions. Instead of hard-coding conditions to instantiate classes like \texttt{AdminUser}, \texttt{LecturerUser}, or \texttt{StudentUser}, the system defines an abstract creator, \texttt{UserFactory}, that declares a method \texttt{createUser(roleType)}.
+A concrete factory (\texttt{RoleUserFactory}) decides which user class to instantiate.
+
+Adding a new role such as \texttt{VisitorUser} requires only extending the factory, adhering to the Open--Closed Principle.
+
+\subsubsection{Factory Method — Class Diagram}
+\begin{figure}[H]
+	\centering
+	\begin{tikzpicture}[scale=1, transform shape]
+		\tikzset{
+			umlrel/.style={-Latex, line width=0.6pt, shorten >=3pt, shorten <=3pt},
+			umllabel/.style={midway, fill=white, inner sep=1pt},
+			umlgen/.style={umlrel},
+			umlimpl/.style={umlrel, dashed}
+		}
+		
+		% Creator & Concrete Creator
+		\begin{abstractclass}[text width=5.2cm]{UserFactory}{-6,3}
+			\operation{+ createUser(role: RoleType, id: string) : User}
+		\end{abstractclass}
+		
+		\begin{class}[text width=5.2cm]{RoleUserFactory}{-6,-2}
+			\operation{+ createUser(role: RoleType, id: string) : User}
+		\end{class}
+		
+		% Product hierarchy
+		\begin{abstractclass}[text width=4.8cm]{User}{2,3}
+			\attribute{+ id : string}
+			\attribute{+ role : RoleType}
+			\operation{+ getRole() : RoleType}
+		\end{abstractclass}
+		
+		\begin{class}{AdminUser}{0.5,-1.0}\end{class}
+		\begin{class}{LecturerUser}{2.0,-2.5}\end{class}
+		\begin{class}{StudentUser}{4.5,-4.0}\end{class}
+		\begin{class}{VisitorUser}{5.5,-5.50}\end{class}
+		
+		% Optional client
+		\begin{class}[text width=6cm]{AccessController}{-6,-6}
+			\operation{+ handleScan(cardId: string, doorId: string) : void}
+			\operation{+ notify(evt: AccessEvent) : void}
+			\operation{+ attach(o: Observer) : void}
+			\operation{+ detach(o: Observer) : void}
+		\end{class}
+		
+		% Inheritance (solid)
+		\draw[umlgen] (RoleUserFactory.north) -- (UserFactory.south);
+		\draw[umlgen] (AdminUser.north) -- (User.south -| AdminUser.north);
+		
+		\draw[umlgen] 
+		($(LecturerUser.east)+(0,0)$) -- ++(0,0.1)
+		-| ($(User.east)+(2.7,-0.0)$)
+		-- node[umllabel, above]{}
+		(User.east);
+		
+		\draw[umlgen] 
+		($(StudentUser.east)+(0,0)$) -- ++(0,0.1)
+		-| ($(User.east)+(3.7,-0.0)$)
+		-- node[umllabel, above]{}
+		(User.east);
+		
+		\draw[umlgen] 
+		($(VisitorUser.east)+(0,0)$) -- ++(0,0.1)
+		-| ($(User.east)+(4.7,-0.0)$)
+		-- node[umllabel, above]{}
+		(User.east);
+		
+		
+		% Client uses factory
+		\draw[umlgen] 
+		($(AccessController.west)+(0,0.2)$) -- ++(0,0.1)
+		-| ($(UserFactory.west)+(-0.7,-0.0)$)
+		-- node[umllabel, above]{uses}
+		(UserFactory.west);
+		
+		% Concrete creator “creates” concrete products
+		\draw[umlrel] (RoleUserFactory.east) -- node[umllabel]{\footnotesize \guillemotleft create\guillemotright} (AdminUser.west);
+		\draw[umlrel] (RoleUserFactory.east) -- node[umllabel]{\footnotesize \guillemotleft create\guillemotright} (LecturerUser.west);
+		\draw[umlrel] (RoleUserFactory.east) -- node[umllabel]{\footnotesize \guillemotleft create\guillemotright} (StudentUser.west);
+		\draw[umlrel] (RoleUserFactory.east) -- node[umllabel]{\footnotesize \guillemotleft create\guillemotright} (VisitorUser.west);
+		
+	\end{tikzpicture}
+	\caption{Factory Method: \texttt{UserFactory} (creator) \textrightarrow{} \texttt{RoleUserFactory} (concrete creator) producing concrete \texttt{User} types.}
+\end{figure}
+
+
+\newpage
+\subsection{Observer Pattern - Real-Time Notification System}
+The \textbf{Observer pattern} manages the flow of real-time updates within the system.
+It defines a one-to-many relationship between a \textit{Subject} (the event source) and \textit{multiple Observers} (the components that respond to those events).
+ In this project, \textbf{AccessController} and \textbf{RoomSensorSubject} act as subjects. Observers such as \texttt{DashboardDisplay} and \texttt{LogService} subscribe via \texttt{attach()/detach()}. When a subject calls \texttt{notify()}, all observers update automatically. This loose coupling allows new observers to be added without altering existing code.
+ 
+ \subsubsection{Observer — Class Diagram}
+ \begin{figure}[H]
+ 	\centering
+ 	\begin{tikzpicture}[scale=1, transform shape]
+ 		\tikzset{
+ 			umlrel/.style={-Latex, line width=0.6pt, shorten >=3pt, shorten <=3pt},
+ 			umllabel/.style={midway, fill=white, inner sep=1pt},
+ 			umlgen/.style={umlrel},
+ 			umlimpl/.style={umlrel, dashed}
+ 		}
+ 		
+ 		% Interfaces
+ 		\begin{interface}[text width=5.4cm]{Subject}{-5,3}
+ 			\operation{+ attach(o: Observer) : void}
+ 			\operation{+ detach(o: Observer) : void}
+ 			\operation{+ notify(evt: AccessEvent) : void}
+ 		\end{interface}
+ 		
+ 		\begin{interface}[text width=4.8cm]{Observer}{6,3}
+ 			\operation{+ update(evt: AccessEvent) : void}
+ 		\end{interface}
+ 		
+ 		% Concrete Subjects
+ 		\begin{class}[text width=5.4cm]{AccessController}{-7,-4.5}
+ 			\operation{+ handleScan(cardId: string, doorId: string) : void}
+ 			\operation{+ attach(o),\; detach(o),\; notify(evt)}
+ 		\end{class}
+ 		
+ 		\begin{class}[text width=5.4cm]{RoomSensorSubject}{-1,-4.5}
+ 			\operation{+ setOccupied(roomId: string, flag: bool) : void}
+ 			\operation{+ attach(o),\; detach(o),\; notify(evt)}
+ 		\end{class}
+ 		
+ 		% Concrete Observers
+ 		\begin{class}{DashboardDisplay}{0.8,-1.5}\end{class}
+ 		\begin{class}{LogService}{5.7,-1.5}\end{class}
+ 		
+ 		% Realizations (implements = dashed)
+ 		\draw[umlimpl] (AccessController.north) -- (Subject.south -| AccessController.north);
+ 		\draw[umlimpl] (RoomSensorSubject.north) -- (Subject.south);
+ 		\draw[umlimpl] (DashboardDisplay.north) -- (Observer.west);
+ 		\draw[umlimpl] (LogService.north) -- (Observer.south -| LogService.north);
+ 		
+ 		% Notification links (plain solid arrows)
+ 		
+ 		\draw[umlrel]
+ 		($(AccessController.south)+(0,0.1)$) -- ++(0,-1.1)
+ 		-| ($(DashboardDisplay.south)+(1.8,-1.0)$)
+ 		-- node[umllabel, below]{notify}
+ 		(DashboardDisplay.south);
+ 		
+ 		\draw[umlrel]
+ 		($(AccessController.south)+(0,0.1)$) -- ++(0,-1.1)
+ 		-| ($(LogService.east)+(0.5,0)$)
+ 		-- node[umllabel, below]{notify}
+ 		(LogService.east);
+ 		
+ 		\draw[umlrel] (RoomSensorSubject.north) -- node[umllabel]{\footnotesize notify} (DashboardDisplay.south);
+ 		
+ 		\draw[umlrel]
+ 		($(RoomSensorSubject.east)+(0,0)$) -- ++(0,0)
+ 		-| ($(LogService.south)+(0,0)$)
+ 		-- node[umlgen, left]{notify}
+ 		(LogService.south);
+ 		
+ 		
+ 	\end{tikzpicture}
+ 	\caption{Observer: Subjects (\texttt{AccessController}, \texttt{RoomSensorSubject}) implement \texttt{Subject} and notify Observers (\texttt{DashboardDisplay}, \texttt{LogService}) that implement \texttt{Observer}.}
+ \end{figure}
+ 
+ 
+\newpage
+\section{Sequence Diagram: Card Scan / Authorization Flow}
+
+\begin{figure}[H]
+	\centering
+	\begin{sequencediagram}
+		
+		\newthread{cr}{CardReader}
+		\newinst{ac}{AccessController}
+		\newinst{apm}{AccessPolicyManager}
+		\newinst{uf}{UserFactory}
+		\newinst{dash}{DashboardDisplay}
+		\newinst{log}{LogService}
+		
+		% 1) Card scan arrives
+		\begin{messcall}{cr}{scan cardId; doorId}{ac}
+		\end{messcall}
+		
+		% 2) Singleton lookup + role check
+		\begin{call}{ac}{getInstance()}{apm}{}
+		\end{call}
+		\begin{call}{ac}{getRole(userId)}{apm}{}
+		\end{call}
+		
+		% 3) Factory creates user object
+		\begin{call}{ac}{createUser(role, userId)}{uf}{}
+		\end{call}
+		
+		% 4) Authorization via singleton
+		\begin{call}{ac}{isAllowed(u, doorId)}{apm}{}
+		\end{call}
+		
+		% 5) Notify observers (Observer pattern)
+		\begin{call}{ac}{notify AccessGranted/Denied}{dash}{}
+		\end{call}
+		\begin{call}{ac}{notify AccessGranted/Denied}{log}{}
+		\end{call}
+		
+	\end{sequencediagram}
+	\caption{Sequence Diagram: AccessController handles a scan, consults the Singleton policy, creates the User via Factory Method, and notifies Observers.}
+	
+\end{figure}
+The sequence diagram illustrates the interaction flow for a card scan authorization process within the University Access Control System. When a user scans their ID card, the \texttt{AccessController} orchestrates the entire operation by retrieving the centralized policy instance from the \texttt{AccessPolicyManager} (Singleton pattern), identifying the user’s role, and dynamically creating the appropriate user object through the \texttt{UserFactory} (Factory Method pattern). The controller then verifies access permissions and notifies subscribed observers such as the \texttt{DashboardDisplay} and \texttt{LogService} (Observer pattern) about whether access was granted or denied. This unified flow demonstrates how the three design patterns collaborate to maintain modularity, scalability, and real-time responsiveness in the system.
+
+\newpage
+\section{NS Diagrams}
+\subsection{NS 1 - AccessPolicyManager.getInstance()}
+\begin{figure}[H]
+	\centering
+	\begin{struktogramm}(120,55)
+		\ifthenelse{2}{2}{\(instance == \mathsf{null}\)}{\pTrue}{\pFalse}
+		\assign{\(instance \leftarrow\) new AccessPolicyManager()}
+		\change
+		% Leave empty for no action in else branch (package will auto-fill with ∅ if heights differ)
+		\ifend
+		\assign{return instance}
+	\end{struktogramm}
+	\caption{NS diagram: Singleton \texttt{getInstance()}. If no instance exists, create it; then return the single instance.}
+	
+\end{figure}
+
+\subsection{NS 2 - RoleUserFactory.createUser(role, id)}
+\begin{figure}[H]
+	\centering
+	\begin{struktogramm}(120,50)
+		\case{5}{4}{role}{\textbf{ADMIN}}
+		\assign{\(\textbf{return}\) AdminUser(id)}
+		\switch{\textbf{LECTURER}}
+		\assign{\(\textbf{return}\) LecturerUser(id)}
+		\switch{\textbf{STUDENT}}
+		\assign{\(\textbf{return}\) StudentUser(id)}
+		\switch{\textbf{otherwise}}
+		\assign{\(\textbf{return}\) VisitorUser(id)}
+		\caseend
+	\end{struktogramm}
+	\caption{NS diagram: Factory Method \texttt{createUser(role, id)} returning the concrete \texttt{User}.}
+	
+\end{figure}
+
+\subsection{NS 3 - Subject.notify(evt)}
+\begin{figure}[H]
+	\centering
+	\begin{struktogramm}(140,20)
+		\while{more observers?}
+		\assign{observer \(\leftarrow\) nextObserver()}
+		\assign{observer.update(evt)}
+		\whileend
+	\end{struktogramm}
+	\caption{NS diagram: Observer \texttt{notify(evt)} iterates through subscribers and calls \texttt{update}.}
+\end{figure}
+
+\section*{Bonus: Prototype Demonstration}
+The complete Python implementation demonstrating the three behavioral patterns 
+is available at:
+\url{https://github.com/Oluwaferanmiii/patterns_demonstration}
+
+
+\end{document}
